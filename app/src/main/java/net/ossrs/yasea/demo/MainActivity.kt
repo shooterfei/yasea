@@ -1,174 +1,158 @@
-package net.ossrs.yasea.demo;
+package net.ossrs.yasea.demo
 
-import android.Manifest;
-import android.content.SharedPreferences;
-import android.content.pm.ActivityInfo;
-import android.content.pm.PackageManager;
-import android.content.res.Configuration;
-import android.hardware.Camera;
-import android.os.Build;
-import android.os.Bundle;
-import android.os.Environment;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
-import android.view.Menu;
-import android.view.MenuItem;
-import android.view.View;
-import android.view.WindowManager;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.Toast;
+import android.Manifest
+import android.support.v7.app.AppCompatActivity
+import com.github.faucamp.simplertmp.RtmpHandler.RtmpListener
+import net.ossrs.yasea.SrsRecordHandler.SrsRecordListener
+import net.ossrs.yasea.SrsEncodeHandler.SrsEncodeListener
+import android.content.SharedPreferences
+import android.os.Environment
+import net.ossrs.yasea.SrsPublisher
+import net.ossrs.yasea.SrsCameraView
+import android.os.Bundle
+import android.view.WindowManager
+import net.ossrs.yasea.demo.R
+import android.content.pm.ActivityInfo
+import android.os.Build
+import android.support.v4.content.ContextCompat
+import android.content.pm.PackageManager
+import android.content.res.Configuration
+import android.hardware.Camera
+import android.support.v4.app.ActivityCompat
+import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
+import android.widget.Button
+import net.ossrs.yasea.demo.MainActivity
+import android.widget.EditText
+import net.ossrs.yasea.SrsEncodeHandler
+import com.github.faucamp.simplertmp.RtmpHandler
+import net.ossrs.yasea.SrsRecordHandler
+import net.ossrs.yasea.SrsCameraView.CameraCallbacksHandler
+import com.seu.magicfilter.utils.MagicFilterType
+import android.widget.Toast
+import java.io.IOException
+import java.lang.Exception
+import java.lang.IllegalArgumentException
+import java.lang.IllegalStateException
+import java.lang.StringBuilder
+import java.net.SocketException
+import java.util.*
 
-import com.github.faucamp.simplertmp.RtmpHandler;
-import com.seu.magicfilter.utils.MagicFilterType;
+class MainActivity : AppCompatActivity(), RtmpListener, SrsRecordListener, SrsEncodeListener {
+    private var btnPublish: Button? = null
 
-import net.ossrs.yasea.SrsCameraView;
-import net.ossrs.yasea.SrsEncodeHandler;
-import net.ossrs.yasea.SrsPublisher;
-import net.ossrs.yasea.SrsRecordHandler;
-
-import java.io.IOException;
-import java.net.SocketException;
-import java.util.Random;
-
-public class MainActivity extends AppCompatActivity implements RtmpHandler.RtmpListener,
-                        SrsRecordHandler.SrsRecordListener, SrsEncodeHandler.SrsEncodeListener {
-
-    private static final String TAG = "Yasea";
-    public final static int RC_CAMERA = 100;
-
-    private Button btnPublish;
-/*    private Button btnSwitchCamera;
+    /*    private Button btnSwitchCamera;
     private Button btnRecord;
     private Button btnSwitchEncoder;
     private Button btnPause;*/
+    private var sp: SharedPreferences? = null
 
-    private SharedPreferences sp;
-//    private String rtmpUrl = "rtmp://ossrs.net/" + getRandomAlphaString(3) + '/' + getRandomAlphaDigitString(5);
-    private String rtmpUrl = "rtmp://192.168.3.41:19350/live/stream_4";
-    private String recPath = Environment.getExternalStorageDirectory().getPath() + "/test.mp4";
-
-    private SrsPublisher mPublisher;
-    private SrsCameraView mCameraView;
-
-    private int mWidth = 640;
-    private int mHeight = 480;
-    private boolean isPermissionGranted = false;
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        setContentView(R.layout.activity_main);
+    //    private String rtmpUrl = "rtmp://ossrs.net/" + getRandomAlphaString(3) + '/' + getRandomAlphaDigitString(5);
+    private var rtmpUrl = "rtmp://192.168.50.12:1093/Users/wf/projects/zeusight/android/yasea\n5/live/stream_4"
+    private val recPath = Environment.getExternalStorageDirectory().path + "/test.mp4"
+    private var mPublisher: SrsPublisher? = null
+    private var mCameraView: SrsCameraView? = null
+    private val mWidth = 640
+    private val mHeight = 480
+    private var isPermissionGranted = false
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        setContentView(R.layout.activity_main)
 
         // response screen rotation event
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
-
-        requestPermission();
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
+        requestPermission()
     }
 
-    private void requestPermission() {
+    private fun requestPermission() {
         //1. 检查是否已经有该权限
-        if (Build.VERSION.SDK_INT >= 23 && (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-                != PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-                != PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                != PackageManager.PERMISSION_GRANTED)) {
+        if (Build.VERSION.SDK_INT >= 23 && ((ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                        != PackageManager.PERMISSION_GRANTED) || (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                        != PackageManager.PERMISSION_GRANTED) || (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        != PackageManager.PERMISSION_GRANTED))) {
             //2. 权限没有开启，请求权限
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO, Manifest.permission.WRITE_EXTERNAL_STORAGE}, RC_CAMERA);
-        }else{
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO, Manifest.permission.WRITE_EXTERNAL_STORAGE), RC_CAMERA)
+        } else {
             //权限已经开启，做相应事情
-            isPermissionGranted = true;
-            init();
+            isPermissionGranted = true
+            init()
         }
     }
 
     //3. 接收申请成功或者失败回调
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == RC_CAMERA) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            if (grantResults.size > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 //权限被用户同意,做相应的事情
-                isPermissionGranted = true;
-                init();
+                isPermissionGranted = true
+                init()
             } else {
                 //权限被用户拒绝，做相应的事情
-                finish();
+                finish()
             }
         }
     }
 
-    private void init() {
+    private fun init() {
         // restore data.
-        sp = getSharedPreferences("Yasea", MODE_PRIVATE);
-        rtmpUrl = sp.getString("rtmpUrl", rtmpUrl);
+        sp = getSharedPreferences("Yasea", MODE_PRIVATE)
+        rtmpUrl = sp!!.getString("rtmpUrl", rtmpUrl)
 
         // initialize url.
-        final EditText efu = (EditText) findViewById(R.id.url);
-        efu.setText(rtmpUrl);
-
-        btnPublish = (Button) findViewById(R.id.publish);
-      /*  btnSwitchCamera = (Button) findViewById(R.id.swCam);
+        val efu = findViewById<View>(R.id.url) as EditText
+        efu.setText(rtmpUrl)
+        btnPublish = findViewById<View>(R.id.publish) as Button
+        /*  btnSwitchCamera = (Button) findViewById(R.id.swCam);
         btnRecord = (Button) findViewById(R.id.record);
         btnSwitchEncoder = (Button) findViewById(R.id.swEnc);
         btnPause = (Button) findViewById(R.id.pause);
 
-        btnPause.setEnabled(false);*/
-        mCameraView = (SrsCameraView) findViewById(R.id.glsurfaceview_camera);
-
-        mPublisher = new SrsPublisher(mCameraView);
-        mPublisher.setEncodeHandler(new SrsEncodeHandler(this));
-        mPublisher.setRtmpHandler(new RtmpHandler(this));
-        mPublisher.setRecordHandler(new SrsRecordHandler(this));
-        mPublisher.setPreviewResolution(mWidth, mHeight);
-        mPublisher.setOutputResolution(mHeight, mWidth); // 这里要和preview反过来
-        mPublisher.setVideoHDMode();
-        mPublisher.startCamera();
-
-        mCameraView.setCameraCallbacksHandler(new SrsCameraView.CameraCallbacksHandler(){
-            @Override
-            public void onCameraParameters(Camera.Parameters params) {
+        btnPause.setEnabled(false);*/mCameraView = findViewById<View>(R.id.glsurfaceview_camera) as SrsCameraView
+        mPublisher = SrsPublisher(mCameraView)
+        mPublisher!!.setEncodeHandler(SrsEncodeHandler(this))
+        mPublisher!!.setRtmpHandler(RtmpHandler(this))
+        mPublisher!!.setRecordHandler(SrsRecordHandler(this))
+        mPublisher!!.setPreviewResolution(mWidth, mHeight)
+        mPublisher!!.setOutputResolution(mHeight, mWidth) // 这里要和preview反过来
+        mPublisher!!.setVideoHDMode()
+        mPublisher!!.startCamera()
+        mCameraView!!.setCameraCallbacksHandler(object : CameraCallbacksHandler() {
+            override fun onCameraParameters(params: Camera.Parameters) {
                 //params.setFocusMode("custom-focus");
                 //params.setWhiteBalance("custom-balance");
                 //etc...
             }
-        });
+        })
+        btnPublish!!.setOnClickListener {
+            if (btnPublish!!.text.toString().contentEquals("publish")) {
+                rtmpUrl = efu.text.toString()
+                val editor = sp!!.edit()
+                editor.putString("rtmpUrl", rtmpUrl)
+                editor.apply()
+                mPublisher!!.startPublish(rtmpUrl)
+                mPublisher!!.startCamera()
 
-        btnPublish.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (btnPublish.getText().toString().contentEquals("publish")) {
-                    rtmpUrl = efu.getText().toString();
-                    SharedPreferences.Editor editor = sp.edit();
-                    editor.putString("rtmpUrl", rtmpUrl);
-                    editor.apply();
-
-                    mPublisher.startPublish(rtmpUrl);
-                    mPublisher.startCamera();
-
-                 /*   if (btnSwitchEncoder.getText().toString().contentEquals("soft encoder")) {
+                /*   if (btnSwitchEncoder.getText().toString().contentEquals("soft encoder")) {
                         Toast.makeText(getApplicationContext(), "Use hard encoder", Toast.LENGTH_SHORT).show();
                     } else {
                         Toast.makeText(getApplicationContext(), "Use soft encoder", Toast.LENGTH_SHORT).show();
-                    }*/
-                    btnPublish.setText("stop");
-           /*         btnSwitchEncoder.setEnabled(false);
+                    }*/btnPublish!!.text = "stop"
+                /*         btnSwitchEncoder.setEnabled(false);
                     btnPause.setEnabled(true);*/
-                } else if (btnPublish.getText().toString().contentEquals("stop")) {
-                    mPublisher.stopPublish();
-                    mPublisher.stopRecord();
-                    btnPublish.setText("publish");
-                    /*btnRecord.setText("record");
+            } else if (btnPublish!!.text.toString().contentEquals("stop")) {
+                mPublisher!!.stopPublish()
+                mPublisher!!.stopRecord()
+                btnPublish!!.text = "publish"
+                /*btnRecord.setText("record");
                     btnSwitchEncoder.setEnabled(true);
                     btnPause.setEnabled(false);*/
-                }
             }
-        });
-/*
+        }
+        /*
         btnPause.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -221,278 +205,212 @@ public class MainActivity extends AppCompatActivity implements RtmpHandler.RtmpL
 */
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
         // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_main, menu);
-        return true;
+        menuInflater.inflate(R.menu.menu_main, menu)
+        return true
     }
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
         // Handle action bar item clicks here. The action bar will
         // automatically handle clicks on the Home/Up button, so long
         // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
+        val id = item.itemId
         if (id == R.id.action_settings) {
-            return true;
+            return true
         } else {
-            switch (id) {
-                case R.id.cool_filter:
-                    mPublisher.switchCameraFilter(MagicFilterType.COOL);
-                    break;
-                case R.id.beauty_filter:
-                    mPublisher.switchCameraFilter(MagicFilterType.BEAUTY);
-                    break;
-                case R.id.early_bird_filter:
-                    mPublisher.switchCameraFilter(MagicFilterType.EARLYBIRD);
-                    break;
-                case R.id.evergreen_filter:
-                    mPublisher.switchCameraFilter(MagicFilterType.EVERGREEN);
-                    break;
-                case R.id.n1977_filter:
-                    mPublisher.switchCameraFilter(MagicFilterType.N1977);
-                    break;
-                case R.id.nostalgia_filter:
-                    mPublisher.switchCameraFilter(MagicFilterType.NOSTALGIA);
-                    break;
-                case R.id.romance_filter:
-                    mPublisher.switchCameraFilter(MagicFilterType.ROMANCE);
-                    break;
-                case R.id.sunrise_filter:
-                    mPublisher.switchCameraFilter(MagicFilterType.SUNRISE);
-                    break;
-                case R.id.sunset_filter:
-                    mPublisher.switchCameraFilter(MagicFilterType.SUNSET);
-                    break;
-                case R.id.tender_filter:
-                    mPublisher.switchCameraFilter(MagicFilterType.TENDER);
-                    break;
-                case R.id.toast_filter:
-                    mPublisher.switchCameraFilter(MagicFilterType.TOASTER2);
-                    break;
-                case R.id.valencia_filter:
-                    mPublisher.switchCameraFilter(MagicFilterType.VALENCIA);
-                    break;
-                case R.id.walden_filter:
-                    mPublisher.switchCameraFilter(MagicFilterType.WALDEN);
-                    break;
-                case R.id.warm_filter:
-                    mPublisher.switchCameraFilter(MagicFilterType.WARM);
-                    break;
-                case R.id.original_filter:
-                default:
-                    mPublisher.switchCameraFilter(MagicFilterType.NONE);
-                    break;
+            when (id) {
+                R.id.cool_filter -> mPublisher!!.switchCameraFilter(MagicFilterType.COOL)
+                R.id.beauty_filter -> mPublisher!!.switchCameraFilter(MagicFilterType.BEAUTY)
+                R.id.early_bird_filter -> mPublisher!!.switchCameraFilter(MagicFilterType.EARLYBIRD)
+                R.id.evergreen_filter -> mPublisher!!.switchCameraFilter(MagicFilterType.EVERGREEN)
+                R.id.n1977_filter -> mPublisher!!.switchCameraFilter(MagicFilterType.N1977)
+                R.id.nostalgia_filter -> mPublisher!!.switchCameraFilter(MagicFilterType.NOSTALGIA)
+                R.id.romance_filter -> mPublisher!!.switchCameraFilter(MagicFilterType.ROMANCE)
+                R.id.sunrise_filter -> mPublisher!!.switchCameraFilter(MagicFilterType.SUNRISE)
+                R.id.sunset_filter -> mPublisher!!.switchCameraFilter(MagicFilterType.SUNSET)
+                R.id.tender_filter -> mPublisher!!.switchCameraFilter(MagicFilterType.TENDER)
+                R.id.toast_filter -> mPublisher!!.switchCameraFilter(MagicFilterType.TOASTER2)
+                R.id.valencia_filter -> mPublisher!!.switchCameraFilter(MagicFilterType.VALENCIA)
+                R.id.walden_filter -> mPublisher!!.switchCameraFilter(MagicFilterType.WALDEN)
+                R.id.warm_filter -> mPublisher!!.switchCameraFilter(MagicFilterType.WARM)
+                R.id.original_filter -> mPublisher!!.switchCameraFilter(MagicFilterType.NONE)
+                else -> mPublisher!!.switchCameraFilter(MagicFilterType.NONE)
             }
         }
-        setTitle(item.getTitle());
-
-        return super.onOptionsItemSelected(item);
+        title = item.title
+        return super.onOptionsItemSelected(item)
     }
 
-    @Override
-    protected void onStart() {
-        super.onStart();
-        if(mPublisher.getCamera() == null && isPermissionGranted){
+    override fun onStart() {
+        super.onStart()
+        if (mPublisher!!.camera == null && isPermissionGranted) {
             //if the camera was busy and available again
-            mPublisher.startCamera();
+            mPublisher!!.startCamera()
         }
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        final Button btn = (Button) findViewById(R.id.publish);
-        btn.setEnabled(true);
-        mPublisher.resumeRecord();
+    override fun onResume() {
+        super.onResume()
+        val btn = findViewById<View>(R.id.publish) as Button
+        btn.isEnabled = true
+        mPublisher!!.resumeRecord()
     }
 
-    @Override
-    protected void onPause() {
-        super.onPause();
-        mPublisher.pauseRecord();
+    override fun onPause() {
+        super.onPause()
+        mPublisher!!.pauseRecord()
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        mPublisher.stopPublish();
-        mPublisher.stopRecord();
+    override fun onDestroy() {
+        super.onDestroy()
+        mPublisher!!.stopPublish()
+        mPublisher!!.stopRecord()
     }
 
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        mPublisher.stopEncode();
-        mPublisher.stopRecord();
-//        btnRecord.setText("record");
-        mPublisher.setScreenOrientation(newConfig.orientation);
-        if (btnPublish.getText().toString().contentEquals("stop")) {
-            mPublisher.startEncode();
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        mPublisher!!.stopEncode()
+        mPublisher!!.stopRecord()
+        //        btnRecord.setText("record");
+        mPublisher!!.setScreenOrientation(newConfig.orientation)
+        if (btnPublish!!.text.toString().contentEquals("stop")) {
+            mPublisher!!.startEncode()
         }
-        mPublisher.startCamera();
+        mPublisher!!.startCamera()
     }
 
-    private static String getRandomAlphaString(int length) {
-        String base = "abcdefghijklmnopqrstuvwxyz";
-        Random random = new Random();
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < length; i++) {
-            int number = random.nextInt(base.length());
-            sb.append(base.charAt(number));
-        }
-        return sb.toString();
-    }
-
-    private static String getRandomAlphaDigitString(int length) {
-        String base = "abcdefghijklmnopqrstuvwxyz0123456789";
-        Random random = new Random();
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < length; i++) {
-            int number = random.nextInt(base.length());
-            sb.append(base.charAt(number));
-        }
-        return sb.toString();
-    }
-
-    private void handleException(Exception e) {
+    private fun handleException(e: Exception) {
         try {
-            Toast.makeText(getApplicationContext(), e.getMessage(), Toast.LENGTH_SHORT).show();
-            mPublisher.stopPublish();
-            mPublisher.stopRecord();
-            btnPublish.setText("publish");
-//            btnRecord.setText("record");
+            Toast.makeText(applicationContext, e.message, Toast.LENGTH_SHORT).show()
+            mPublisher!!.stopPublish()
+            mPublisher!!.stopRecord()
+            btnPublish!!.text = "publish"
+            //            btnRecord.setText("record");
 //            btnSwitchEncoder.setEnabled(true);
-        } catch (Exception e1) {
+        } catch (e1: Exception) {
             //
         }
     }
 
     // Implementation of SrsRtmpListener.
-
-    @Override
-    public void onRtmpConnecting(String msg) {
-        Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_SHORT).show();
+    override fun onRtmpConnecting(msg: String) {
+        Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show()
     }
 
-    @Override
-    public void onRtmpConnected(String msg) {
-        Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_SHORT).show();
+    override fun onRtmpConnected(msg: String) {
+        Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show()
     }
 
-    @Override
-    public void onRtmpVideoStreaming() {
+    override fun onRtmpVideoStreaming() {}
+    override fun onRtmpAudioStreaming() {}
+    override fun onRtmpStopped() {
+        Toast.makeText(applicationContext, "Stopped", Toast.LENGTH_SHORT).show()
     }
 
-    @Override
-    public void onRtmpAudioStreaming() {
+    override fun onRtmpDisconnected() {
+        Toast.makeText(applicationContext, "Disconnected", Toast.LENGTH_SHORT).show()
     }
 
-    @Override
-    public void onRtmpStopped() {
-        Toast.makeText(getApplicationContext(), "Stopped", Toast.LENGTH_SHORT).show();
+    override fun onRtmpVideoFpsChanged(fps: Double) {
+        Log.i(TAG, String.format("Output Fps: %f", fps))
     }
 
-    @Override
-    public void onRtmpDisconnected() {
-        Toast.makeText(getApplicationContext(), "Disconnected", Toast.LENGTH_SHORT).show();
-    }
-
-    @Override
-    public void onRtmpVideoFpsChanged(double fps) {
-        Log.i(TAG, String.format("Output Fps: %f", fps));
-    }
-
-    @Override
-    public void onRtmpVideoBitrateChanged(double bitrate) {
-        int rate = (int) bitrate;
+    override fun onRtmpVideoBitrateChanged(bitrate: Double) {
+        val rate = bitrate.toInt()
         if (rate / 1000 > 0) {
-            Log.i(TAG, String.format("Video bitrate: %f kbps", bitrate / 1000));
+            Log.i(TAG, String.format("Video bitrate: %f kbps", bitrate / 1000))
         } else {
-            Log.i(TAG, String.format("Video bitrate: %d bps", rate));
+            Log.i(TAG, String.format("Video bitrate: %d bps", rate))
         }
     }
 
-    @Override
-    public void onRtmpAudioBitrateChanged(double bitrate) {
-        int rate = (int) bitrate;
+    override fun onRtmpAudioBitrateChanged(bitrate: Double) {
+        val rate = bitrate.toInt()
         if (rate / 1000 > 0) {
-            Log.i(TAG, String.format("Audio bitrate: %f kbps", bitrate / 1000));
+            Log.i(TAG, String.format("Audio bitrate: %f kbps", bitrate / 1000))
         } else {
-            Log.i(TAG, String.format("Audio bitrate: %d bps", rate));
+            Log.i(TAG, String.format("Audio bitrate: %d bps", rate))
         }
     }
 
-    @Override
-    public void onRtmpSocketException(SocketException e) {
-        handleException(e);
+    override fun onRtmpSocketException(e: SocketException) {
+        handleException(e)
     }
 
-    @Override
-    public void onRtmpIOException(IOException e) {
-        handleException(e);
+    override fun onRtmpIOException(e: IOException) {
+        handleException(e)
     }
 
-    @Override
-    public void onRtmpIllegalArgumentException(IllegalArgumentException e) {
-        handleException(e);
+    override fun onRtmpIllegalArgumentException(e: IllegalArgumentException) {
+        handleException(e)
     }
 
-    @Override
-    public void onRtmpIllegalStateException(IllegalStateException e) {
-        handleException(e);
+    override fun onRtmpIllegalStateException(e: IllegalStateException) {
+        handleException(e)
     }
 
     // Implementation of SrsRecordHandler.
-
-    @Override
-    public void onRecordPause() {
-        Toast.makeText(getApplicationContext(), "Record paused", Toast.LENGTH_SHORT).show();
+    override fun onRecordPause() {
+        Toast.makeText(applicationContext, "Record paused", Toast.LENGTH_SHORT).show()
     }
 
-    @Override
-    public void onRecordResume() {
-        Toast.makeText(getApplicationContext(), "Record resumed", Toast.LENGTH_SHORT).show();
+    override fun onRecordResume() {
+        Toast.makeText(applicationContext, "Record resumed", Toast.LENGTH_SHORT).show()
     }
 
-    @Override
-    public void onRecordStarted(String msg) {
-        Toast.makeText(getApplicationContext(), "Recording file: " + msg, Toast.LENGTH_SHORT).show();
+    override fun onRecordStarted(msg: String) {
+        Toast.makeText(applicationContext, "Recording file: $msg", Toast.LENGTH_SHORT).show()
     }
 
-    @Override
-    public void onRecordFinished(String msg) {
-        Toast.makeText(getApplicationContext(), "MP4 file saved: " + msg, Toast.LENGTH_SHORT).show();
+    override fun onRecordFinished(msg: String) {
+        Toast.makeText(applicationContext, "MP4 file saved: $msg", Toast.LENGTH_SHORT).show()
     }
 
-    @Override
-    public void onRecordIOException(IOException e) {
-        handleException(e);
+    override fun onRecordIOException(e: IOException) {
+        handleException(e)
     }
 
-    @Override
-    public void onRecordIllegalArgumentException(IllegalArgumentException e) {
-        handleException(e);
+    override fun onRecordIllegalArgumentException(e: IllegalArgumentException) {
+        handleException(e)
     }
 
     // Implementation of SrsEncodeHandler.
-
-    @Override
-    public void onNetworkWeak() {
-        Toast.makeText(getApplicationContext(), "Network weak", Toast.LENGTH_SHORT).show();
+    override fun onNetworkWeak() {
+        Toast.makeText(applicationContext, "Network weak", Toast.LENGTH_SHORT).show()
     }
 
-    @Override
-    public void onNetworkResume() {
-        Toast.makeText(getApplicationContext(), "Network resume", Toast.LENGTH_SHORT).show();
+    override fun onNetworkResume() {
+        Toast.makeText(applicationContext, "Network resume", Toast.LENGTH_SHORT).show()
     }
 
-    @Override
-    public void onEncodeIllegalArgumentException(IllegalArgumentException e) {
-        handleException(e);
+    override fun onEncodeIllegalArgumentException(e: IllegalArgumentException) {
+        handleException(e)
     }
 
+    companion object {
+        private const val TAG = "Yasea"
+        const val RC_CAMERA = 100
+        private fun getRandomAlphaString(length: Int): String {
+            val base = "abcdefghijklmnopqrstuvwxyz"
+            val random = Random()
+            val sb = StringBuilder()
+            for (i in 0 until length) {
+                val number = random.nextInt(base.length)
+                sb.append(base[number])
+            }
+            return sb.toString()
+        }
+
+        private fun getRandomAlphaDigitString(length: Int): String {
+            val base = "abcdefghijklmnopqrstuvwxyz0123456789"
+            val random = Random()
+            val sb = StringBuilder()
+            for (i in 0 until length) {
+                val number = random.nextInt(base.length)
+                sb.append(base[number])
+            }
+            return sb.toString()
+        }
+    }
 }
