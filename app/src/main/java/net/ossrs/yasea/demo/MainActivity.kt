@@ -50,7 +50,7 @@ class MainActivity : AppCompatActivity(), RtmpListener, SrsRecordListener, SrsEn
     private var sp: SharedPreferences? = null
 
     //    private String rtmpUrl = "rtmp://ossrs.net/" + getRandomAlphaString(3) + '/' + getRandomAlphaDigitString(5);
-    private var rtmpUrl = "rtmp://192.168.50.12:1093/Users/wf/projects/zeusight/android/yasea\n5/live/stream_4"
+    private var rtmpUrl = "rtmp://192.168.50.12:10935/live/stream_4"
     private val recPath = Environment.getExternalStorageDirectory().path + "/test.mp4"
     private var mPublisher: SrsPublisher? = null
     private var mCameraView: SrsCameraView? = null
